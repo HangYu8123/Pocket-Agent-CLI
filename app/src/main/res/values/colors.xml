@@ -1,0 +1,12 @@
+<resources>
+    <color name="bg">#0F1115</color>
+    <color name="surface">#181B22</color>
+    <color name="surface2">#222630</color>
+    <color name="fg">#E6E8EE</color>
+    <color name="fg_muted">#9AA1B1</color>
+    <color name="accent">#7C9CFF</color>
+    <color name="accent_claude">#D97757</color>
+    <color name="accent_codex">#10A37F</color>
+    <color name="key_bg">#262A34</color>
+    <color name="key_bg_active">#7C9CFF</color>
+</resources>

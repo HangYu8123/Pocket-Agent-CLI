@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory android:title="Terminal">
+        <SeekBarPreference
+            android:key="font_size"
+            android:title="Font size"
+            android:defaultValue="12"
+            android:max="24"
+            app:min="8"
+            app:showSeekBarValue="true" />
+        <SwitchPreferenceCompat
+            android:key="haptic_keys"
+            android:title="Haptic feedback on extra keys"
+            android:defaultValue="true" />
+        <SwitchPreferenceCompat
+            android:key="terminal_char_input"
+            android:title="Raw keyboard input"
+            android:summary="Sends each key directly and disables suggestions. Off (default) keeps a normal text field so keyboard mic keys and voice typing work."
+            android:defaultValue="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Dictation">
+        <ListPreference
+            android:key="voice_engine"
+            android:title="Speech engine"
+            android:entries="@array/voice_engine_entries"
+            android:entryValues="@array/voice_engine_values"
+            android:defaultValue="auto"
+            app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            android:key="whisper_model"
+            android:title="Whisper model (offline)"
+            android:entries="@array/whisper_model_entries"
+            android:entryValues="@array/whisper_model_values"
+            android:defaultValue="base"
+            app:useSimpleSummaryProvider="true" />
+        <ListPreference
+            android:key="voice_language"
+            android:title="Dictation language"
+            android:entries="@array/voice_language_entries"
+            android:entryValues="@array/voice_language_values"
+            android:defaultValue="auto"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+            android:key="voice_auto_enter"
+            android:title="Send after dictation"
+            android:summary="Press Enter automatically after voice input is inserted."
+            android:defaultValue="false" />
+        <Preference
+            android:key="whisper_delete"
+            android:title="Delete downloaded speech models" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Linux environment">
+        <Preference
+            android:key="update_clis"
+            android:title="Update Claude Code and Codex"
+            android:summary="Runs npm install -g for both CLIs inside Ubuntu." />
+        <Preference
+            android:key="storage_access"
+            android:title="Allow access to phone storage"
+            android:summary="Grants All files access so /sdcard is visible inside Ubuntu." />
+        <SwitchPreferenceCompat
+            android:key="proot_no_seccomp"
+            android:title="Disable proot seccomp acceleration"
+            android:summary="Turn on only if sessions fail to start on this device (slower)."
+            android:defaultValue="false" />
+        <Preference
+            android:key="reinstall"
+            android:title="Reinstall Ubuntu environment"
+            android:summary="Deletes the whole Linux environment, including files in /root." />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Help">
+        <Preference
+            android:key="voice_help"
+            android:title="Voice input not working?"
+            android:summary="Shows which speech engine this phone provides and the alternatives." />
+        <Preference
+            android:key="phantom_help"
+            android:title="Sessions get killed in the background?"
+            android:summary="Android 12+ limits child processes. Tap for the one-time adb fix." />
+        <Preference
+            android:key="about"
+            android:title="About and open-source licenses" />
+    </PreferenceCategory>
+</PreferenceScreen>

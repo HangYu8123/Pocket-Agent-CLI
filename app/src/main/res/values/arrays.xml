@@ -1,0 +1,50 @@
+<resources>
+    <string-array name="voice_engine_entries">
+        <item>Automatic (phone service, else offline Whisper)</item>
+        <item>Phone speech service (Google)</item>
+        <item>Offline Whisper (built in)</item>
+        <item>Keyboard voice typing</item>
+    </string-array>
+    <string-array name="voice_engine_values">
+        <item>auto</item>
+        <item>system</item>
+        <item>whisper</item>
+        <item>keyboard</item>
+    </string-array>
+    <string-array name="whisper_model_entries">
+        <item>Tiny · fastest, 32 MB</item>
+        <item>Base · balanced, 60 MB (default)</item>
+        <item>Small · most accurate, 190 MB</item>
+    </string-array>
+    <string-array name="whisper_model_values">
+        <item>tiny</item>
+        <item>base</item>
+        <item>small</item>
+    </string-array>
+    <string-array name="voice_language_entries">
+        <item>Auto-detect</item>
+        <item>English</item>
+        <item>中文 (Chinese)</item>
+        <item>日本語 (Japanese)</item>
+        <item>한국어 (Korean)</item>
+        <item>Español</item>
+        <item>Français</item>
+        <item>Deutsch</item>
+        <item>Português</item>
+        <item>Русский</item>
+        <item>हिन्दी (Hindi)</item>
+    </string-array>
+    <string-array name="voice_language_values">
+        <item>auto</item>
+        <item>en</item>
+        <item>zh</item>
+        <item>ja</item>
+        <item>ko</item>
+        <item>es</item>
+        <item>fr</item>
+        <item>de</item>
+        <item>pt</item>
+        <item>ru</item>
+        <item>hi</item>
+    </string-array>
+</resources>

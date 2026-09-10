@@ -1,0 +1,6 @@
+aarch64 proot: pool/main/p/proot/proot_5.1.107.92_aarch64.deb
+aarch64 libtalloc: pool/main/libt/libtalloc/libtalloc_2.4.3_aarch64.deb
+aarch64 libandroid-shmem: pool/main/liba/libandroid-shmem/libandroid-shmem_0.7_aarch64.deb
+x86_64 proot: pool/main/p/proot/proot_5.1.107.92_x86_64.deb
+x86_64 libtalloc: pool/main/libt/libtalloc/libtalloc_2.4.3_x86_64.deb
+x86_64 libandroid-shmem: pool/main/liba/libandroid-shmem/libandroid-shmem_0.7_x86_64.deb
