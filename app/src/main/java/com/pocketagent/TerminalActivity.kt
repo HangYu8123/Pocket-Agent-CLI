@@ -116,6 +116,10 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
         bindService(svc, conn, Context.BIND_AUTO_CREATE)
 
         if (BuildConfig.DEBUG) intent.getStringExtra("debug_transcribe")?.let { debugTranscribe(it) }
+        // `--es debug_dictate file.wav`: full dictation pipeline with a WAV standing in for the mic.
+        if (BuildConfig.DEBUG) intent.getStringExtra("debug_dictate")?.let { path ->
+            handler.postDelayed({ voice.debugDictateFromWav(path) }, 4000) // after the session is attached
+        }
     }
 
     /**

@@ -85,6 +85,13 @@ one is for the emulator.
 
 * Whisper model + inference: `am start -n com.pocketagent/.TerminalActivity --es mode shell --es
   debug_transcribe /sdcard/…/jfk.wav` (debug builds) logs `DEBUG_TRANSCRIBE ok … text=…`.
+* Whole dictation pipeline with speech standing in for the mic: `am start -n
+  com.pocketagent/.TerminalActivity --es mode shell --es debug_dictate /sdcard/…/clip.wav`
+  (debug builds, needs `adb root` on the emulator) transcribes the WAV, cleans it, shows the
+  banner and inserts the text into the terminal exactly as the mic button does. Verified with
+  macOS `say` clips: English sentences come back verbatim with the base model; Mandarin needs
+  the Small model plus the language pinned to `zh`. The decoder gets a per-language coding
+  vocabulary prompt (`WhisperEngine.promptFor`), which fixed "Python" in Chinese output.
 * Recorder → Whisper → banner: every in-app dictation in a debug build writes
   `Android/data/com.pocketagent/files/last_dictation.wav` and logs a `DICTATION samples=… rms=…
   peak=…` line (tag `PocketWhisper`). A silent recording shows "Microphone captured silence".

@@ -20,7 +20,7 @@ object WhisperLib {
     init { System.loadLibrary("pocketwhisper") }
     external fun initContext(path: String): Long
     external fun freeContext(ctx: Long)
-    external fun transcribe(ctx: Long, pcm: FloatArray, language: String, threads: Int, translate: Boolean): String
+    external fun transcribe(ctx: Long, pcm: FloatArray, language: String, threads: Int, translate: Boolean, prompt: String): String
     external fun systemInfo(): String
 }
 
@@ -81,8 +81,16 @@ class WhisperEngine(private val c: Context) {
         synchronized(WhisperEngine) {
             if (ctx == 0L) throw IOException("Model not loaded")
             val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
-            return WhisperLib.transcribe(ctx, pcm, language, threads, translate).trim()
+            return WhisperLib.transcribe(ctx, pcm, language, threads, translate, promptFor(language)).trim()
         }
+    }
+
+    /** Vocabulary hint for the decoder; the words a coding agent hears most. */
+    private fun promptFor(language: String): String = when (language) {
+        "zh" -> "写一个 Python 脚本，运行代码，git 提交，npm 安装，终端命令，Claude Code，Codex。"
+        "ja" -> "Python スクリプトを書いて、コードを実行、git、npm、ターミナル、Claude Code、Codex。"
+        "ko" -> "Python 스크립트를 작성하고 코드를 실행, git, npm, 터미널, Claude Code, Codex."
+        else -> "Write a Python script, run the code, git commit, npm install, terminal command, Claude Code, Codex."
     }
 
     fun unload() {

@@ -227,7 +227,30 @@ class VoiceInput(
     private fun stopRecordingAndTranscribe(model: WhisperEngine.Model = WhisperEngine.Model.of(prefs.whisperModel)) {
         val rec = recorder ?: return
         recorder = null
-        val pcm = rec.stop()
+        transcribeAndInsert(rec.stop(), model)
+    }
+
+    /**
+     * Debug builds: run the exact dictation pipeline (transcribe → clean → banner → insert into
+     * the terminal) on a 16 kHz mono 16-bit WAV instead of microphone audio.
+     */
+    fun debugDictateFromWav(path: String) {
+        val bytes = java.io.File(path).readBytes()
+        val pcm = FloatArray((bytes.size - 44) / 2) { i ->
+            val lo = bytes[44 + i * 2].toInt() and 0xff
+            val hi = bytes[45 + i * 2].toInt()
+            ((hi shl 8) or lo) / 32768f
+        }
+        val model = WhisperEngine.Model.of(prefs.whisperModel)
+        if (!whisper.isDownloaded(model)) {
+            activity.lifecycleScope.launch {
+                try { whisper.download(model) {} } catch (e: Exception) { onStatus("Download failed: $e"); return@launch }
+                transcribeAndInsert(pcm, model)
+            }
+        } else transcribeAndInsert(pcm, model)
+    }
+
+    private fun transcribeAndInsert(pcm: FloatArray, model: WhisperEngine.Model) {
         if (pcm.size < WhisperEngine.SAMPLE_RATE / 2) { onStatus("Too short. Tap the mic and speak."); return }
         onStatus("Transcribing ${pcm.size / WhisperEngine.SAMPLE_RATE}s of audio…")
         val lang = prefs.voiceLanguage

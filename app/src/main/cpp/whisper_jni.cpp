@@ -26,7 +26,7 @@ Java_com_pocketagent_WhisperLib_freeContext(JNIEnv *, jobject, jlong ctx) {
 
 JNIEXPORT jstring JNICALL
 Java_com_pocketagent_WhisperLib_transcribe(JNIEnv *env, jobject, jlong ctxp, jfloatArray pcm,
-                                           jstring lang, jint threads, jboolean translate) {
+                                           jstring lang, jint threads, jboolean translate, jstring prompt) {
     auto *ctx = (whisper_context *) ctxp;
     if (!ctx) return env->NewStringUTF("");
     jfloat *data = env->GetFloatArrayElements(pcm, nullptr);
@@ -34,6 +34,12 @@ Java_com_pocketagent_WhisperLib_transcribe(JNIEnv *env, jobject, jlong ctxp, jfl
     const char *l = env->GetStringUTFChars(lang, nullptr);
     std::string language(l ? l : "auto");
     env->ReleaseStringUTFChars(lang, l);
+    std::string initial;
+    if (prompt) {
+        const char *pr = env->GetStringUTFChars(prompt, nullptr);
+        if (pr) initial = pr;
+        env->ReleaseStringUTFChars(prompt, pr);
+    }
 
     whisper_full_params p = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
     p.print_realtime = false;
@@ -46,6 +52,8 @@ Java_com_pocketagent_WhisperLib_transcribe(JNIEnv *env, jobject, jlong ctxp, jfl
     p.no_context = true;
     p.single_segment = false;
     p.suppress_blank = true;
+    // A short domain prompt biases decoding toward coding vocabulary (Python, git, npm...).
+    if (!initial.empty()) p.initial_prompt = initial.c_str();
 
     const int rc = whisper_full(ctx, p, data, n);
     env->ReleaseFloatArrayElements(pcm, data, JNI_ABORT);

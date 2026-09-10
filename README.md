@@ -59,7 +59,7 @@ Settings live under **⋮** on the home screen.
 | --- | --- |
 | Bigger text | Pinch the terminal, or terminal menu → *Font size* |
 | Send dictation without pressing Enter | *Dictation → Send after dictation* |
-| Chinese (or other) dictation | *Dictation → Dictation language* |
+| Chinese (or other) dictation | *Dictation → Dictation language*, and *Whisper model → Small* for offline use |
 | Better offline transcription | *Dictation → Whisper model → Small* (190 MB) |
 | Files visible to other apps | *Allow access to phone storage*, then use a *Phone ·* folder |
 | Newer Claude Code / Codex | *Update Claude Code and Codex* |
