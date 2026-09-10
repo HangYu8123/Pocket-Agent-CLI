@@ -98,10 +98,18 @@ one is for the emulator.
 * Keyboard voice typing: with the terminal focused, `dumpsys input_method` must show
   `inputType=0xa0001`; Gboard then shows its mic key and "Speak now". Emoji from Gboard's panel
   travel the same `commitText` path as dictated words.
-* The Android emulator on macOS hangs QEMU when `-allow-host-audio` is used with `AudioRecord`,
-  so real microphone audio can only be tested on a phone.
+* Emulator microphone on macOS: the first `-allow-host-audio` run hangs QEMU because macOS shows a
+  microphone-permission prompt for the Terminal process (grant it once). Afterwards, run the
+  emulator with a window and send `adb emu avd hostmicon`; `AudioRecord` then receives audio, but
+  it arrives heavily muffled and Whisper cannot transcribe it, so real speech recognition through
+  the microphone is only meaningful on a phone.
 
 ## Gotchas found the hard way
+
+* whisper.cpp can emit byte sequences that are not valid UTF-8 (hallucinated tokens on silence
+  or noise). `NewStringUTF()` on such bytes makes ART abort the whole process ("JNI DETECTED
+  ERROR: input is not valid Modified UTF-8"). The JNI bridge therefore returns raw bytes and
+  Kotlin decodes them with replacement. Found on the emulator after a silent 90 s recording.
 
 * `TerminalView.setTypeface()` must be called after `setTextSize()` (it dereferences the renderer).
 * `TerminalViewClient.onKeyUp(int, KeyEvent)` has the same signature as `Activity.onKeyUp`; the

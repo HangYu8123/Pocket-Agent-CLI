@@ -20,7 +20,10 @@ object WhisperLib {
     init { System.loadLibrary("pocketwhisper") }
     external fun initContext(path: String): Long
     external fun freeContext(ctx: Long)
-    external fun transcribe(ctx: Long, pcm: FloatArray, language: String, threads: Int, translate: Boolean, prompt: String): String
+    external fun transcribeBytes(ctx: Long, pcm: FloatArray, language: String, threads: Int, translate: Boolean, prompt: String): ByteArray
+    /** Decodes whisper's raw UTF-8; invalid sequences (hallucinated tokens) become U+FFFD instead of crashing. */
+    fun transcribe(ctx: Long, pcm: FloatArray, language: String, threads: Int, translate: Boolean, prompt: String): String =
+        String(transcribeBytes(ctx, pcm, language, threads, translate, prompt), Charsets.UTF_8).replace("\uFFFD", "")
     external fun systemInfo(): String
 }
 

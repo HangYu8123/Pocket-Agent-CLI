@@ -24,11 +24,14 @@ Java_com_pocketagent_WhisperLib_freeContext(JNIEnv *, jobject, jlong ctx) {
     if (ctx) whisper_free((whisper_context *) ctx);
 }
 
-JNIEXPORT jstring JNICALL
-Java_com_pocketagent_WhisperLib_transcribe(JNIEnv *env, jobject, jlong ctxp, jfloatArray pcm,
-                                           jstring lang, jint threads, jboolean translate, jstring prompt) {
+// Returns raw UTF-8 bytes rather than a jstring: whisper can emit partial multi-byte sequences
+// (hallucinations on silence/noise) and NewStringUTF() aborts the whole process on those.
+// Kotlin decodes with String(bytes, UTF_8), which replaces invalid sequences instead.
+JNIEXPORT jbyteArray JNICALL
+Java_com_pocketagent_WhisperLib_transcribeBytes(JNIEnv *env, jobject, jlong ctxp, jfloatArray pcm,
+                                                jstring lang, jint threads, jboolean translate, jstring prompt) {
     auto *ctx = (whisper_context *) ctxp;
-    if (!ctx) return env->NewStringUTF("");
+    if (!ctx) return env->NewByteArray(0);
     jfloat *data = env->GetFloatArrayElements(pcm, nullptr);
     const jsize n = env->GetArrayLength(pcm);
     const char *l = env->GetStringUTFChars(lang, nullptr);
@@ -59,7 +62,7 @@ Java_com_pocketagent_WhisperLib_transcribe(JNIEnv *env, jobject, jlong ctxp, jfl
     env->ReleaseFloatArrayElements(pcm, data, JNI_ABORT);
     if (rc != 0) {
         LOGI("whisper_full failed: %d", rc);
-        return env->NewStringUTF("");
+        return env->NewByteArray(0);
     }
     std::string out;
     const int ns = whisper_full_n_segments(ctx);
@@ -67,7 +70,9 @@ Java_com_pocketagent_WhisperLib_transcribe(JNIEnv *env, jobject, jlong ctxp, jfl
         const char *t = whisper_full_get_segment_text(ctx, i);
         if (t) out += t;
     }
-    return env->NewStringUTF(out.c_str());
+    jbyteArray arr = env->NewByteArray((jsize) out.size());
+    if (arr && !out.empty()) env->SetByteArrayRegion(arr, 0, (jsize) out.size(), (const jbyte *) out.data());
+    return arr;
 }
 
 JNIEXPORT jstring JNICALL
