@@ -28,6 +28,9 @@
     <string name="workspace_custom_path">Custom path…</string>
     <string name="workspace_use_this">Use this folder</string>
     <string name="workspace_created">Folder created and selected</string>
+    <string name="workspace_open">Open…</string>
+    <string name="open_working_folder">Open working folder</string>
+    <string name="open_in_files_app">Open in Files app</string>
     <string name="session_ended">Session ended</string>
     <string name="restart">Restart</string>
     <string name="close">Close</string>

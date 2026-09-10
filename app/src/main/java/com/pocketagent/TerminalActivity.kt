@@ -257,7 +257,8 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
         m.menu.add(0, 3, 2, "Font size +")
         m.menu.add(0, 4, 3, "Font size -")
         m.menu.add(0, 5, 4, if (b.extraKeysScroll.visibility == View.VISIBLE) "Hide extra keys" else "Show extra keys")
-        m.menu.add(0, 6, 5, "Settings")
+        m.menu.add(0, 7, 5, getString(R.string.open_working_folder))
+        m.menu.add(0, 6, 6, "Settings")
         m.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> restartSession()
@@ -266,6 +267,7 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
                 4 -> { prefs.fontSizeSp -= 1; applyFontSize() }
                 5 -> b.extraKeysScroll.visibility = if (b.extraKeysScroll.visibility == View.VISIBLE) View.GONE else View.VISIBLE
                 6 -> startActivity(Intent(this, SettingsActivity::class.java))
+                7 -> FolderBrowser.open(this, service?.cwdOf(mode) ?: Workspace.current(this))
             }
             true
         }

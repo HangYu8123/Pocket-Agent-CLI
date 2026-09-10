@@ -1,0 +1,6 @@
+<resources>
+    <!-- Strings used by the vendored Termux terminal-view text-selection menu. -->
+    <string name="copy_text">Copy</string>
+    <string name="paste_text">Paste</string>
+    <string name="text_selection_more">More…</string>
+</resources>

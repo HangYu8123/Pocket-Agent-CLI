@@ -232,6 +232,7 @@ class VoiceInput(
         onStatus("Transcribing ${pcm.size / WhisperEngine.SAMPLE_RATE}s of audio…")
         val lang = prefs.voiceLanguage
         activity.lifecycleScope.launch {
+            val t0 = System.currentTimeMillis()
             val text = try {
                 withContext(Dispatchers.IO) {
                     whisper.ensureLoaded(model)
@@ -240,8 +241,35 @@ class VoiceInput(
             } catch (e: Exception) { onStatus("Transcription failed: ${e.message}"); return@launch }
             onStatus(null)
             val cleaned = text.replace(Regex("\\[[^\\]]*\\]|\\([^)]*\\)"), "").trim() // drop [MUSIC]-style tags
-            if (cleaned.isBlank()) onStatus("Nothing recognized. Try again closer to the mic.") else onText(cleaned)
+            if (BuildConfig.DEBUG) debugDump(pcm, cleaned, System.currentTimeMillis() - t0)
+            if (cleaned.isBlank()) {
+                var peak = 0f
+                for (v in pcm) if (kotlin.math.abs(v) > peak) peak = kotlin.math.abs(v)
+                onStatus(
+                    if (peak < 0.01f) "Microphone captured silence (level %.3f). Check that no other app holds the mic, then try again.".format(peak)
+                    else "Nothing recognized (%ds, level %.2f). Speak closer to the mic, or pick the language in Settings.".format(pcm.size / WhisperEngine.SAMPLE_RATE, peak)
+                )
+            } else onText(cleaned)
         }
+    }
+
+    /** Debug builds: keep the last recording as a WAV and log level/result so tests can verify the mic path. */
+    private fun debugDump(pcm: FloatArray, text: String, ms: Long) {
+        try {
+            var sum = 0.0; var peak = 0f
+            for (v in pcm) { sum += v * v; if (kotlin.math.abs(v) > peak) peak = kotlin.math.abs(v) }
+            val rms = kotlin.math.sqrt(sum / pcm.size.coerceAtLeast(1))
+            val f = java.io.File(activity.getExternalFilesDir(null), "last_dictation.wav")
+            java.io.DataOutputStream(java.io.BufferedOutputStream(java.io.FileOutputStream(f))).use { o ->
+                val dataLen = pcm.size * 2
+                fun le32(v: Int) { o.write(v and 0xff); o.write((v shr 8) and 0xff); o.write((v shr 16) and 0xff); o.write((v shr 24) and 0xff) }
+                fun le16(v: Int) { o.write(v and 0xff); o.write((v shr 8) and 0xff) }
+                o.writeBytes("RIFF"); le32(36 + dataLen); o.writeBytes("WAVE"); o.writeBytes("fmt "); le32(16); le16(1); le16(1)
+                le32(WhisperEngine.SAMPLE_RATE); le32(WhisperEngine.SAMPLE_RATE * 2); le16(2); le16(16); o.writeBytes("data"); le32(dataLen)
+                for (v in pcm) le16((v.coerceIn(-1f, 1f) * 32767).toInt())
+            }
+            android.util.Log.i("PocketWhisper", "DICTATION samples=${pcm.size} rms=%.4f peak=%.3f ms=$ms text=\"$text\" wav=${f.absolutePath}".format(rms, peak))
+        } catch (_: Exception) {}
     }
 
     // ------------------------------------------------------------------ keyboard voice typing

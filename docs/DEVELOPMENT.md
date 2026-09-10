@@ -34,6 +34,16 @@ Technical reference for people building or modifying the app. For usage, see the
 * **Working folder** (`Workspace.kt`): a guest path stored in preferences. Ubuntu paths map to
   `files/ubuntu/…`; `/sdcard` and `/storage` paths map 1:1 to the host because proot bind-mounts
   them. `Proot.resolveCwd()` creates the folder on launch and falls back to `/root/projects`.
+* **Terminal view** (`app/src/main/java/com/termux/view`): Termux's terminal-view v0.118.3 is
+  vendored (GPL-3.0) rather than pulled from JitPack, because its `onCreateInputConnection`
+  advertises either `TYPE_NULL` or a visible-password field, and keyboards (Gboard, Samsung,
+  Sogou) refuse voice typing on both. The vendored copy advertises
+  `TYPE_CLASS_TEXT | TYPE_TEXT_FLAG_NO_SUGGESTIONS | TYPE_TEXT_FLAG_MULTI_LINE` by default,
+  which keeps the keyboard mic key enabled and leaves autocorrect off. "Raw keyboard input" in
+  Settings restores upstream behaviour.
+* **Folder browser** (`FolderBrowser.kt`): lists the working folder in-app, opens files through
+  a `FileProvider`, and hands phone-storage folders to the system Files app via a
+  `DocumentsContract` URI.
 * **Dictation** (`VoiceInput.kt`, `WhisperEngine.kt`): system speech dialog → RecognitionService →
   offline whisper.cpp (`app/src/main/cpp`, built with the NDK, models from Hugging Face
   `ggerganov/whisper.cpp`, q5_1 quantised) → keyboard mic. Debug builds accept
@@ -70,6 +80,19 @@ one is for the emulator.
   already confined to the app's private storage.
 * **Python packages**: `pip install` works directly (`break-system-packages` is preset), and
   `python` resolves to `python3`.
+
+## Verifying dictation
+
+* Whisper model + inference: `am start -n com.pocketagent/.TerminalActivity --es mode shell --es
+  debug_transcribe /sdcard/…/jfk.wav` (debug builds) logs `DEBUG_TRANSCRIBE ok … text=…`.
+* Recorder → Whisper → banner: every in-app dictation in a debug build writes
+  `Android/data/com.pocketagent/files/last_dictation.wav` and logs a `DICTATION samples=… rms=…
+  peak=…` line (tag `PocketWhisper`). A silent recording shows "Microphone captured silence".
+* Keyboard voice typing: with the terminal focused, `dumpsys input_method` must show
+  `inputType=0xa0001`; Gboard then shows its mic key and "Speak now". Emoji from Gboard's panel
+  travel the same `commitText` path as dictated words.
+* The Android emulator on macOS hangs QEMU when `-allow-host-audio` is used with `AudioRecord`,
+  so real microphone audio can only be tested on a phone.
 
 ## Gotchas found the hard way
 

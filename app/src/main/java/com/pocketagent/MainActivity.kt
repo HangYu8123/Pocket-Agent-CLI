@@ -47,6 +47,7 @@ class MainActivity : AppCompatActivity() {
         b.btnInstall.setOnClickListener { onInstallClicked() }
         b.btnChooseFolder.setOnClickListener { chooseFolder() }
         b.btnNewFolder.setOnClickListener { newFolder() }
+        b.btnOpenFolder.setOnClickListener { FolderBrowser.open(this) }
         b.hint.text = "Tip: agents start in the working folder above. In the terminal, tap the microphone to dictate. " +
             "Login links from Claude Code and Codex open in your browser automatically."
     }

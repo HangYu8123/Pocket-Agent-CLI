@@ -39,43 +39,13 @@ Runs the real **Claude Code** and **Codex** CLIs on your Android phone, inside a
 Speak or type. The agent writes the code, runs it, fixes it. Your laptop stays off.
 
 
-## What changes
-
-
-<table>
-<tr>
-<td width="50%">
-
-## Before
-
-> Idea on the train. Open notes app. Type a reminder. Get home. Boot the laptop. Wait for updates. Open the terminal. Remember what the idea was. Try to recreate it. It's 11pm.
-
-</td>
-
-<td width="50%">
-
-## After
-
-> Idea on the train. Open Pocket-CLI. Tap the mic.
->
-> 1. "Write a script that pulls my calendar and finds free evenings."
-> 2. Claude Code writes it, runs it, shows the output.
-> 3. Say "make it a weekly summary." Done.
->
-> Next: it's still 9am. You're still on the train.
-
-</td>
-</tr>
-</table>
-
-
 ## How to use
 
 7 things to know. Everything else works like the desktop CLI.
 
 1. **Home screen** — Claude Code, Codex, Ubuntu shell. A *running* badge means the session is still alive; tap to jump back in.
 2. **Mic button** — tap, speak, Enter. Long-press to pick the engine: phone speech service, offline Whisper (built in, no Google), or your keyboard's mic key.
-3. **Working folder** — where agents start. **New folder…** creates one inside Ubuntu or on phone storage and selects it.
+3. **Working folder** — where agents start. **New folder…** creates one inside Ubuntu or on phone storage; **Open…** browses it, opens files in other apps, or jumps to the Files app.
 4. **Extra keys** — ESC, TAB, CTRL, ALT, ^C, arrows under the terminal. CTRL is sticky: tap it, then a letter.
 5. **Links** — login pages open in your browser by themselves. The 🔗 icon re-opens the last one.
 6. **Background** — sessions keep running while you switch apps. Keep the notification on.

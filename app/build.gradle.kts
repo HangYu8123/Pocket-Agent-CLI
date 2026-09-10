@@ -68,7 +68,9 @@ android {
 }
 
 dependencies {
-    implementation("com.github.termux.termux-app:terminal-view:v0.118.3")
+    // terminal-view is vendored under app/src/main/java/com/termux/view (GPL-3.0) so the IME
+    // input type can be changed; only the emulator library is pulled from JitPack.
+    implementation("com.github.termux.termux-app:terminal-emulator:v0.118.3")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.activity:activity-ktx:1.9.2")
