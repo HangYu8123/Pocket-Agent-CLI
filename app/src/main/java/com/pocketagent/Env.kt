@@ -42,8 +42,11 @@ object Env {
 }
 
 enum class Mode(val key: String, val title: String, val command: String, val cwd: String = "/root/projects") {
-    CLAUDE("claude", "Claude Code", "exec claude"),
-    CODEX("codex", "Codex", "exec codex"),
+    // Pre-flight through the bootstrap: if the CLI is missing or its launcher is dangling
+    // (a half-finished install or update), it is reinstalled before launch instead of the
+    // session dying with "claude: not found" (exit 127).
+    CLAUDE("claude", "Claude Code", "bash ${Env.GUEST_BRIDGE}/bootstrap.sh --ensure claude && exec claude"),
+    CODEX("codex", "Codex", "bash ${Env.GUEST_BRIDGE}/bootstrap.sh --ensure codex && exec codex"),
     SHELL("shell", "Ubuntu", ""),
     SETUP("setup", "Setup", "bash ${Env.GUEST_BRIDGE}/bootstrap.sh", "/root"),
     UPDATE("update", "Update CLIs", "bash ${Env.GUEST_BRIDGE}/bootstrap.sh --update", "/root");

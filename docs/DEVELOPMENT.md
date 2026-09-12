@@ -23,6 +23,16 @@ Technical reference for people building or modifying the app. For usage, see the
   downloaded on first launch (~30 MB) and extracted by the app (`RootfsInstaller.kt`). A bootstrap
   script (`assets/bootstrap.sh`) then runs *inside* Ubuntu and installs git, Python, Node.js and
   both CLIs with `apt`/`npm`. It is idempotent; "Resume setup" simply re-runs it.
+* **CLI verification**: `npm install` is not proof that a CLI works. The Claude Code package's
+  postinstall places a native binary over `bin/claude.exe`, and when that fails (partial download,
+  missing platform package) it only prints a warning and npm still exits 0; a failed "Update
+  Claude Code and Codex" can also leave a dangling launcher. Both end in `exec: claude: not found`
+  (exit 127). So the bootstrap's last step runs `claude --version` and `codex --version`,
+  reinstalls a CLI that fails, and writes `.bootstrap_done` only when both start; the versions
+  land in `/pocketagent/cli_versions`. The Claude Code and Codex launchers run
+  `bootstrap.sh --ensure <cli>` first (`Mode` in `Env.kt`), which is a no-op when the launcher
+  resolves to a real executable and otherwise reinstalls that CLI before `exec`. If the repair
+  fails, the marker is removed so the home screen offers "Resume setup".
 * **proot**: the Termux fork of proot (with Android patches) is shipped as `libproot.so` in
   `jniLibs/<abi>/` so Android extracts it to an executable location. `tools/fetch_native.py`
   regenerates those binaries from the Termux package repository and patches the `libtalloc.so.2`
