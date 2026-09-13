@@ -75,10 +75,19 @@ Technical reference for people building or modifying the app. For usage, see the
   `Workspace.DEFAULT` and become the working folder before the agent launches.
 * **Hands-free mode** (`HandsFree.kt`): continuous `Listener`; `VoiceCommands.splitSend` strips
   a trailing "send to Claude Code/Codex" and presses Enter. Reading uses terminal quiescence:
-  every `onTextChanged` restarts a 2.5 s timer (Claude Code's spinner redraws far more often),
-  and when it fires `extractNew()` diffs the emulator transcript against the last snapshot,
-  drops box-drawing chrome, status hints, lines already on screen and the echo of the sent
-  message, then speaks the rest. The listener is muted while TTS plays.
+  `onTextChanged` fires many times a second (Codex redraws ~9×/s even with nothing new on
+  screen), so the transcript is hashed at most every 250 ms and a 2.5 s settle timer restarts
+  only when the content differs. When it fires, `extractNew()` diffs the transcript
+  (`getTranscriptText`, which does not glue exactly-full rows together) against the last
+  snapshot, drops box-drawing chrome, status hints, shell prompts, URLs (spoken as "link") and
+  their wrapped continuation rows, lines already on screen and the echo of the sent message,
+  then speaks the rest. A newly started session has its first screen read (capped at 600
+  characters). Control words ("stop reading", "hands-free off") only apply when they are the
+  whole phrase. The listener is muted while TTS plays. Verified on the emulator against the
+  real Codex and Claude Code onboarding screens, with Google TTS reporting playback start and
+  end (tag `PocketSpeaker`: `TTS_INIT`, `TTS_SPEAK rc=0`, `TTS_START`, `TTS_DONE`); the last
+  diff inputs land in `Android/data/com.pocketagent/files/handsfree_{old,new,spoken}.txt` in
+  debug builds.
 * **i-have-adhd skill** (`bootstrap.sh --skills`, bundled in `assets/skills`): runs at the end
   of setup and of every update, and from Settings. Codex: `codex plugin marketplace add` +
   `codex plugin add`, rules block appended to `~/.codex/AGENTS.md` (the always-on route the

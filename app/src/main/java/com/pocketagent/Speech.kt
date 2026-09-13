@@ -213,20 +213,23 @@ class Speaker(c: Context, private val language: String) {
 
     private val tts: TextToSpeech = TextToSpeech(c.applicationContext) { status ->
         main.post {
+            if (BuildConfig.DEBUG) Log.i(TAG, "TTS_INIT status=$status")
             if (status == TextToSpeech.SUCCESS) {
                 ready = true
                 val loc = if (language == "auto") Locale.getDefault() else Locale.forLanguageTag(language)
                 val r = tts.setLanguage(loc)
+                if (BuildConfig.DEBUG) Log.i(TAG, "TTS_LANG $loc -> $r engine=${tts.defaultEngine}")
                 if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) tts.setLanguage(Locale.US)
                 tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                    override fun onStart(id: String?) {}
-                    override fun onDone(id: String?) { main.post { finished(id) } }
-                    @Deprecated("Deprecated in Java") override fun onError(id: String?) { main.post { finished(id) } }
-                    override fun onError(id: String?, code: Int) { main.post { finished(id) } }
+                    override fun onStart(id: String?) { if (BuildConfig.DEBUG) Log.i(TAG, "TTS_START $id") }
+                    override fun onDone(id: String?) { if (BuildConfig.DEBUG) Log.i(TAG, "TTS_DONE $id"); main.post { finished(id) } }
+                    @Deprecated("Deprecated in Java") override fun onError(id: String?) { Log.w(TAG, "TTS_ERROR $id"); main.post { finished(id) } }
+                    override fun onError(id: String?, code: Int) { Log.w(TAG, "TTS_ERROR $id code=$code"); main.post { finished(id) } }
                 })
                 pump()
             } else {
                 failed = true
+                Log.w(TAG, "TTS_INIT_FAILED status=$status")
                 // Without an engine every request completes immediately so callers still continue.
                 pump()
             }
@@ -254,7 +257,8 @@ class Speaker(c: Context, private val language: String) {
         done[id] = { }
         parts.forEachIndexed { i, p ->
             val pid = if (i == parts.lastIndex) id else "$id-$i"
-            tts.speak(p, if (i == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, pid)
+            val rc = tts.speak(p, if (i == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, pid)
+            if (BuildConfig.DEBUG) Log.i(TAG, "TTS_SPEAK $pid rc=$rc chars=${p.length}")
         }
     }
 
@@ -279,6 +283,7 @@ class Speaker(c: Context, private val language: String) {
     fun shutdown() { stop(); try { tts.shutdown() } catch (_: Exception) {} }
 
     companion object {
+        private const val TAG = "PocketSpeaker"
         private const val MAX = 3500 // TextToSpeech.getMaxSpeechInputLength() is 4000 on all current engines
 
         fun chunk(text: String): List<String> {

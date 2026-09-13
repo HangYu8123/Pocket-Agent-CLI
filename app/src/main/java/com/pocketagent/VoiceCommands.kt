@@ -130,6 +130,9 @@ object VoiceCommands {
         return prev[b.length]
     }
 
+    /** Hands-free control words ("stop reading", "hands-free off") only count when they are the whole utterance. */
+    fun isShortCommand(text: String) = words(text).size <= 5
+
     const val HELP =
         "Say: open Claude, open Codex, open terminal, create a new folder, hands-free on or off, settings, or cancel. " +
         "In hands-free mode, end what you say with: send to Claude Code, or send to Codex. " +

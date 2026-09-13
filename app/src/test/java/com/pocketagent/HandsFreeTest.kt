@@ -40,6 +40,20 @@ class HandsFreeTest {
         assertEquals("Done. Run npm test.", HandsFree.cleanLine("⏺ Done. Run npm test."))
     }
 
+    @Test fun urlsAreSpokenAsLink() {
+        assertEquals("open the following link to authenticate: link", HandsFree.cleanLine("open the following link to authenticate: https://auth.openai.com/oauth/authorize?res=1&x=y"))
+    }
+
+    @Test fun urlFragmentsPromptsAndControlGating() {
+        assertEquals("", HandsFree.cleanLine("code&client_id=app_EMoamEEZ73f0CkXaXp7hrann&redirect_uri"))
+        assertEquals("", HandsFree.cleanLine("S256&id_token_add_organizations=true&codex_cli_simplifie"))
+        assertEquals("internationalization is long", HandsFree.cleanLine("internationalization is long"))
+        assertFalse(HandsFree.keep("root@pocket:~/projects/voice-memo-app#"))
+        assertTrue(HandsFree.keep("hello from pocket"))
+        assertTrue(VoiceCommands.isShortCommand("hands free off"))
+        assertFalse(VoiceCommands.isShortCommand("echo hands free works, send to codex"))
+    }
+
     @Test fun speakerChunksLongText() {
         val text = (1..900).joinToString(" ") { "word$it." }
         val parts = Speaker.chunk(text)

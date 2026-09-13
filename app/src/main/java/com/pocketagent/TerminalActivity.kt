@@ -193,13 +193,14 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
         session = s
         svc.uiClient = this
         b.terminalView.attachSession(s)
+        handsFree.onSessionChanged()
         b.terminalView.onScreenUpdated()
         lastUrl = null
         b.btnLink.visibility = View.GONE
         b.terminalView.requestFocus()
         if (!mode.isMaintenance) {
             val wantHandsFree = intent.getBooleanExtra(EXTRA_HANDS_FREE, false) || prefs.handsFreeDefault
-            if (wantHandsFree) handsFree.enable() else b.terminalView.postDelayed({ showKeyboard() }, 300)
+            if (wantHandsFree) handsFree.enable(readCurrent = !existed) else b.terminalView.postDelayed({ showKeyboard() }, 300)
             if (existed) checkWorkspaceChanged(svc, s)
         }
     }
