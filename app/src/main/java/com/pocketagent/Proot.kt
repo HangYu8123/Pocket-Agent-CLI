@@ -19,14 +19,27 @@ object Proot {
         c.assets.open("bootstrap.sh").use { input ->
             File(bridge, "bootstrap.sh").outputStream().use { input.copyTo(it) }
         }
+        copyAssetTree(c, "skills", File(bridge, "skills"))
         val openUrl = Env.openUrlFile(c)
         if (!openUrl.exists()) openUrl.writeText("")
         FakeProc.write(Env.fakeProc(c))
     }
 
+    /** Recursively copies an assets folder (used for the bundled skills the bootstrap installs). */
+    private fun copyAssetTree(c: Context, assetPath: String, dest: File) {
+        val kids = c.assets.list(assetPath) ?: return
+        if (kids.isEmpty()) { // a file
+            dest.parentFile?.mkdirs()
+            c.assets.open(assetPath).use { input -> dest.outputStream().use { input.copyTo(it) } }
+            return
+        }
+        dest.mkdirs()
+        for (k in kids) copyAssetTree(c, "$assetPath/$k", File(dest, k))
+    }
+
     /** Working directory for this launch: the user's workspace for agents/shell, /root for maintenance. */
     fun resolveCwd(c: Context, mode: Mode): String {
-        if (mode == Mode.SETUP || mode == Mode.UPDATE) {
+        if (mode.isMaintenance) {
             File(Env.rootfs(c), mode.cwd.trimStart('/')).mkdirs()
             return mode.cwd
         }

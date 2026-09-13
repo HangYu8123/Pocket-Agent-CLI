@@ -34,5 +34,8 @@
     <string name="session_ended">Session ended</string>
     <string name="restart">Restart</string>
     <string name="close">Close</string>
+    <string name="voice_command">Voice command</string>
+    <string name="voice_command_sub">Say “open Claude”, “open Codex”, “open terminal” or “create a new folder”</string>
+    <string name="hands_free">Hands-free mode</string>
     <string name="unsupported_abi">This device is neither 64-bit ARM (arm64-v8a) nor x86_64; the Linux environment cannot run here.</string>
 </resources>

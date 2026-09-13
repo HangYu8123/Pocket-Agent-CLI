@@ -53,11 +53,41 @@
             android:title="Delete downloaded speech models" />
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="Voice control">
+        <SwitchPreferenceCompat
+            android:key="wake_word"
+            android:title="Wake word"
+            android:summary="Keeps listening in the background (offline Whisper Tiny, no cloud) and opens Pocket-CLI ready for a voice command when it hears the phrase below."
+            android:defaultValue="false" />
+        <EditTextPreference
+            android:key="wake_phrase"
+            android:title="Wake phrase"
+            android:defaultValue="hey pat"
+            app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+            android:key="hands_free_default"
+            android:title="Start sessions hands-free"
+            android:summary="Every Claude Code, Codex or shell session listens continuously and reads replies aloud."
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="voice_launch_hands_free"
+            android:title="Voice-launched sessions are hands-free"
+            android:summary="When you open an agent by voice, start it in hands-free mode."
+            android:defaultValue="true" />
+        <Preference
+            android:key="voice_commands_help"
+            android:title="What can I say?" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="Linux environment">
         <Preference
             android:key="update_clis"
             android:title="Update Claude Code and Codex"
             android:summary="Runs npm install -g for both CLIs inside Ubuntu." />
+        <Preference
+            android:key="install_skills"
+            android:title="Reinstall the i-have-adhd skill"
+            android:summary="ADHD-friendly output for Claude Code and Codex (github.com/ayghri/i-have-adhd). Installed and switched on by setup; tap to repair or update it." />
         <Preference
             android:key="storage_access"
             android:title="Allow access to phone storage"

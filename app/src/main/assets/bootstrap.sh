@@ -4,6 +4,8 @@
 #   bootstrap.sh --update     refresh Claude Code and Codex to the latest versions
 #   bootstrap.sh --ensure X   pre-flight for launching CLI X (claude|codex): repairs it if
 #                             it is missing or broken, exits 0 only when it actually runs
+#   bootstrap.sh --skills     (re)install the bundled i-have-adhd skill for both CLIs and
+#                             turn it on by default
 MODE="${1:-install}"
 export DEBIAN_FRONTEND=noninteractive
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -12,6 +14,9 @@ NODE_FALLBACK="v24.20.0"
 case "$(uname -m)" in x86_64) NODE_ARCH=x64 ;; *) NODE_ARCH=arm64 ;; esac
 MARKER=/pocketagent/.bootstrap_done
 VERSIONS=/pocketagent/cli_versions
+SKILL_SRC=/pocketagent/skills/i-have-adhd      # shipped with the APK (MIT, github.com/ayghri/i-have-adhd)
+SKILLS_MARKER=/pocketagent/.skills_done
+SKILLS_LOG=/pocketagent/skills.log                # output of the plugin commands, for diagnosis
 
 say()  { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 ok()   { printf '\033[1;32m    %s\033[0m\n' "$*"; }
@@ -79,6 +84,149 @@ verify_clis() {
   return "$rc"
 }
 
+# ---------------------------------------------------------------- i-have-adhd skill
+# Installs github.com/ayghri/i-have-adhd for both CLIs and makes it always-on.
+# Preferred route is each CLI's own plugin command (keeps it updatable with the CLI);
+# when that fails (no network, older CLI) the copy bundled with the APK is installed as a
+# plain skill instead. Either way the always-on switch is set:
+#   Claude Code: ~/.claude/.i-have-adhd-always (read by the plugin's SessionStart hook, or by
+#                the equivalent hook written into ~/.claude/settings.json on the fallback path)
+#   Codex:       a rules block in ~/.codex/AGENTS.md (the route documented by the skill)
+# All steps are idempotent. Never fails the caller: ADHD output shaping is a nicety.
+ADHD_BEGIN="<!-- i-have-adhd:begin -->"
+ADHD_END="<!-- i-have-adhd:end -->"
+
+adhd_rules_block() {
+  cat <<'EOF'
+## Output style (i-have-adhd, always on)
+
+The reader has ADHD. Shape every response so it can be acted on. Full rules: the
+`i-have-adhd` skill; invoke it with `$i-have-adhd` for the complete ruleset.
+
+1. Lead with the answer or next action: command, path, or snippet first.
+2. Number multi-step work; one bounded action per step.
+3. End with one next action doable in under two minutes.
+4. Finish the current issue before raising a new one.
+5. Restate progress each turn ("step 3 of 5 done").
+6. Give time estimates in concrete units, never "a bit".
+7. After a change, show what now works.
+8. Errors: state location, cause, and fix. No drama.
+9. Cap lists to 5 items.
+10. No preamble, no recaps, no closers.
+
+Exceptions: explain fully when asked to explain. Confirm before destructive actions. After
+three failed fixes, stop and name the doubtful assumption. If the request is ambiguous, ask
+one short question. "stop adhd mode" or "normal mode" turns this off for the session.
+EOF
+}
+
+# Writes the rules block between markers in $1 (replacing an older block if present).
+adhd_write_block() {
+  local f=$1 tmp="$1.tmp"
+  mkdir -p "$(dirname "$f")"
+  { [ -f "$f" ] && awk -v b="$ADHD_BEGIN" -v e="$ADHD_END" '
+      $0 == b { skip = 1; next }
+      $0 == e { skip = 0; next }
+      !skip { print }' "$f"
+    printf '\n%s\n' "$ADHD_BEGIN"; adhd_rules_block; printf '%s\n' "$ADHD_END"; } > "$tmp"
+  mv "$tmp" "$f"
+}
+
+# Fallback copy of the skill into a CLI's skills folder ($1 = ~/.claude or ~/.codex).
+adhd_copy_skill() {
+  local dst="$1/skills/i-have-adhd"
+  [ -f "$SKILL_SRC/SKILL.md" ] || { warn "bundled skill missing at $SKILL_SRC"; return 1; }
+  mkdir -p "$dst/agents"
+  cp "$SKILL_SRC/SKILL.md" "$dst/SKILL.md"
+  cp "$SKILL_SRC/agents/openai.yaml" "$dst/agents/openai.yaml" 2>/dev/null || true
+  cp "$SKILL_SRC/LICENSE" "$dst/LICENSE" 2>/dev/null || true
+}
+
+# Claude Code fallback for always-on: a SessionStart hook in ~/.claude/settings.json that
+# prints the skill body whenever the flag file exists (what the plugin's own hook does).
+adhd_claude_hook() {
+  local hook=/root/.claude/hooks/i-have-adhd-always.sh
+  mkdir -p /root/.claude/hooks
+  cat > "$hook" <<'EOF'
+#!/bin/sh
+# i-have-adhd always-on (installed by Pocket-CLI). Remove ~/.claude/.i-have-adhd-always to disable.
+f="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.i-have-adhd-always"
+s="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/i-have-adhd/SKILL.md"
+[ -f "$f" ] && [ -f "$s" ] || exit 0
+printf 'ADHD MODE ACTIVE (always-on). The ruleset below applies to every response. "stop adhd mode" turns it off for this session; delete %s to turn always-on off for good.\n\n' "$f"
+awk 'NR==1 && /^---/ {fm=1; next} fm && /^---/ {fm=0; next} !fm {print}' "$s"
+exit 0
+EOF
+  chmod +x "$hook"
+  python3 - "$hook" /root/.claude/settings.json <<'EOF'
+import json, os, sys
+hook, p = sys.argv[1], sys.argv[2]
+try:
+    d = json.load(open(p))
+except Exception:
+    d = {}
+hooks = d.setdefault("hooks", {})
+starts = hooks.setdefault("SessionStart", [])
+starts = [g for g in starts if not any("i-have-adhd-always" in (h.get("command") or "") for h in g.get("hooks", []))]
+starts.append({"matcher": "startup|resume|clear|compact",
+               "hooks": [{"type": "command", "command": hook, "timeout": 10}]})
+hooks["SessionStart"] = starts
+os.makedirs(os.path.dirname(p), exist_ok=True)
+json.dump(d, open(p, "w"), indent=2)
+EOF
+}
+
+install_skills() {
+  say "Installing the i-have-adhd skill (ADHD-friendly output) for Claude Code and Codex"
+  mkdir -p /root/.claude /root/.codex
+  : > "$SKILLS_LOG"
+
+  # ---- Claude Code
+  # stdin must be closed: with a terminal attached the CLI waits for input and never returns.
+  if cli_present claude && timeout 180 claude plugin marketplace add ayghri/i-have-adhd </dev/null >>"$SKILLS_LOG" 2>&1 \
+     && timeout 180 claude plugin install i-have-adhd@i-have-adhd </dev/null >>"$SKILLS_LOG" 2>&1; then
+    ok "Claude Code: plugin installed (claude plugin install i-have-adhd@i-have-adhd)"
+    # The plugin's own SessionStart hook reads the flag; a stale fallback copy must not double up.
+    rm -rf /root/.claude/skills/i-have-adhd /root/.claude/hooks/i-have-adhd-always.sh
+    [ -f /root/.claude/settings.json ] && python3 - /root/.claude/settings.json <<'EOF' 2>/dev/null || true
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p)); ss = d.get("hooks", {}).get("SessionStart", [])
+ss = [g for g in ss if not any("i-have-adhd-always" in (h.get("command") or "") for h in g.get("hooks", []))]
+if ss: d["hooks"]["SessionStart"] = ss
+else: d.get("hooks", {}).pop("SessionStart", None)
+json.dump(d, open(p, "w"), indent=2)
+EOF
+  else
+    warn "Claude Code: plugin install unavailable (offline or unsupported); using the bundled copy."
+    warn "$(tail -1 "$SKILLS_LOG" 2>/dev/null)"
+    adhd_copy_skill /root/.claude && adhd_claude_hook && ok "Claude Code: skill copied to ~/.claude/skills, always-on hook added"
+  fi
+  touch /root/.claude/.i-have-adhd-always
+  ok "Claude Code: always-on flag set (~/.claude/.i-have-adhd-always)"
+
+  # ---- Codex
+  if cli_present codex && timeout 180 codex plugin marketplace add ayghri/i-have-adhd --ref main </dev/null >>"$SKILLS_LOG" 2>&1 \
+     && timeout 180 codex plugin add i-have-adhd@i-have-adhd </dev/null >>"$SKILLS_LOG" 2>&1; then
+    ok "Codex: plugin installed (codex plugin add i-have-adhd@i-have-adhd)"
+    rm -rf /root/.codex/skills/i-have-adhd
+  else
+    warn "Codex: plugin install unavailable (offline or unsupported); using the bundled copy."
+    warn "$(tail -1 "$SKILLS_LOG" 2>/dev/null)"
+    adhd_copy_skill /root/.codex && ok "Codex: skill copied to ~/.codex/skills (invoke with \$i-have-adhd)"
+  fi
+  adhd_write_block /root/.codex/AGENTS.md
+  ok "Codex: always-on rules written to ~/.codex/AGENTS.md"
+
+  touch "$SKILLS_MARKER"
+  echo "    Say \"stop adhd mode\" inside a session to switch it off for that session."
+}
+
+if [ "$MODE" = "--skills" ]; then
+  install_skills
+  exit 0
+fi
+
 if [ "$MODE" = "--ensure" ]; then
   cli=$2
   [ "$cli" = claude ] || [ "$cli" = codex ] || { fail "usage: bootstrap.sh --ensure claude|codex"; exit 2; }
@@ -104,6 +252,7 @@ fi
 if [ "$MODE" = "--update" ]; then
   say "Updating Claude Code and Codex"
   if npm install -g @anthropic-ai/claude-code@latest @openai/codex@latest && verify_clis; then
+    install_skills
     say "Done."
     exit 0
   fi
@@ -167,6 +316,7 @@ verify_clis || { rm -f "$MARKER"; fail "Setup is not complete. Restart setup to 
 
 mkdir -p /root/projects
 touch "$MARKER"
+[ -f "$SKILLS_MARKER" ] || install_skills
 say "Setup complete."
 echo "    Go back and tap Claude Code or Codex. Each will ask you to log in the first time;"
 echo "    the login page opens in your Android browser automatically."

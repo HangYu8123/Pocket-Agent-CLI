@@ -18,6 +18,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.SwitchPreferenceCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -48,6 +49,35 @@ class SettingsActivity : AppCompatActivity() {
                 if (Env.isReady(ctx)) TerminalActivity.launch(ctx, Mode.UPDATE)
                 else Toast.makeText(ctx, R.string.status_not_installed, Toast.LENGTH_SHORT).show()
                 true
+            }
+            findPreference<Preference>("install_skills")?.setOnPreferenceClickListener {
+                if (Env.isReady(ctx)) TerminalActivity.launch(ctx, Mode.SKILLS)
+                else Toast.makeText(ctx, R.string.status_not_installed, Toast.LENGTH_SHORT).show()
+                true
+            }
+            findPreference<Preference>("voice_commands_help")?.setOnPreferenceClickListener {
+                AlertDialog.Builder(ctx).setTitle("Voice commands")
+                    .setMessage("Home screen (tap Voice command, or say \"${Prefs(ctx).wakePhrase}\" with the wake word on):\n" +
+                        "• \"open Claude\" / \"open Codex\" / \"open terminal\"\n" +
+                        "• \"create a new folder\" (asks for the name, creates it under ~/projects, then asks which agent to open)\n" +
+                        "• \"hands-free on\" / \"hands-free off\", \"settings\", \"cancel\"\n\n" +
+                        "Hands-free mode (terminal menu, or automatic for voice-launched sessions):\n" +
+                        "• Everything you say is typed into the agent. End with \"send to Claude Code\" or \"send to Codex\" to press Enter.\n" +
+                        "• When the agent stops writing, its new output is read aloud. Say \"stop reading\", \"read again\", \"escape\" or \"hands-free off\".\n\n" +
+                        "Wake word: works while the phone is unlocked, with the screen off too. On Android 10+ grant \"Display over other apps\" so the app can open itself; " +
+                        "otherwise a notification appears instead. Xiaomi/HyperOS also needs \"Display pop-up windows while running in the background\" in the app's permissions.")
+                    .setPositiveButton(android.R.string.ok, null).show()
+                true
+            }
+            findPreference<SwitchPreferenceCompat>("wake_word")?.setOnPreferenceChangeListener { pref, value ->
+                if (value == true) { enableWakeWord(pref as SwitchPreferenceCompat); false } // switched on once everything is granted
+                else { WakeWordService.stop(ctx); true }
+            }
+            findPreference<Preference>("wake_phrase")?.setOnPreferenceChangeListener { _, value ->
+                val ok = value.toString().isNotBlank()
+                // The running detector reads the phrase at start; bounce it so the new phrase takes effect.
+                if (ok && WakeWordService.isRunning) { WakeWordService.stop(ctx); requireView().postDelayed({ WakeWordService.start(ctx) }, 500) }
+                ok
             }
             findPreference<Preference>("storage_access")?.setOnPreferenceClickListener {
                 if (Build.VERSION.SDK_INT >= 30) {
@@ -145,6 +175,45 @@ class SettingsActivity : AppCompatActivity() {
                     .setPositiveButton(android.R.string.ok, null)
                     .show()
                 true
+            }
+        }
+
+        private var pendingWake: SwitchPreferenceCompat? = null
+        private val micPermission = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { granted ->
+            val p = pendingWake; pendingWake = null
+            if (granted && p != null) enableWakeWord(p)
+            else Toast.makeText(requireContext(), "Microphone permission is required for the wake word", Toast.LENGTH_LONG).show()
+        }
+
+        /** Turning the wake word on: microphone permission → Whisper Tiny model → overlay permission (optional) → start. */
+        private fun enableWakeWord(pref: SwitchPreferenceCompat) {
+            val ctx = requireContext()
+            if (!WakeWordService.hasMic(ctx)) { pendingWake = pref; micPermission.launch(android.Manifest.permission.RECORD_AUDIO); return }
+            val engine = WhisperEngine(ctx)
+            val model = WakeWordService.MODEL
+            if (!engine.isDownloaded(model)) {
+                val dialog = AlertDialog.Builder(ctx).setTitle("Downloading speech model").setMessage("${model.file} (${model.mb} MB)…").setCancelable(false).show()
+                viewLifecycleOwner.lifecycleScope.launch {
+                    try {
+                        engine.download(model) { f -> requireActivity().runOnUiThread { dialog.setMessage("${model.file}… ${(f * 100).toInt()}%") } }
+                        dialog.dismiss(); enableWakeWord(pref)
+                    } catch (e: Exception) {
+                        dialog.dismiss(); Toast.makeText(ctx, "Download failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+                return
+            }
+            Prefs(ctx).wakeWordEnabled = true
+            pref.isChecked = true
+            WakeWordService.start(ctx)
+            if (Build.VERSION.SDK_INT >= 29 && !Settings.canDrawOverlays(ctx)) {
+                AlertDialog.Builder(ctx).setTitle("Let Pocket-CLI open itself?")
+                    .setMessage("Android only lets an app come to the front from the background when it may \"display over other apps\". " +
+                        "Without it, saying \"${Prefs(ctx).wakePhrase}\" shows a notification you tap instead.\n\nOn Xiaomi/HyperOS also allow \"Display pop-up windows while running in the background\".")
+                    .setPositiveButton("Open settings") { _, _ ->
+                        try { startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${ctx.packageName}"))) } catch (_: Exception) {}
+                    }
+                    .setNegativeButton("Use notification", null).show()
             }
         }
 

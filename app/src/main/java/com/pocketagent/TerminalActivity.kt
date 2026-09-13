@@ -72,13 +72,30 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
     private val voice = VoiceInput(
         this,
         onText = { insertText(it, prefs.voiceAutoEnter) },
-        onStatus = { status ->
-            if (status == null) b.voiceBanner.visibility = View.GONE
-            else { b.voiceBanner.text = status; b.voiceBanner.visibility = View.VISIBLE }
-        },
+        onStatus = ::banner,
     )
 
+    private val handsFree by lazy {
+        HandsFree(this, prefs, ::banner, { session }, { text -> insertText(text, false, quiet = true) })
+    }
+
+    private fun banner(status: String?) {
+        if (status == null) b.voiceBanner.visibility = View.GONE
+        else { b.voiceBanner.text = status; b.voiceBanner.visibility = View.VISIBLE }
+    }
+
     private val notifPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private var pendingAfterMic: (() -> Unit)? = null
+    private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val next = pendingAfterMic; pendingAfterMic = null
+        if (granted) next?.invoke() else banner("Microphone permission denied")
+    }
+
+    /** Runs [block] once RECORD_AUDIO is granted (asking if needed). */
+    fun withMic(block: () -> Unit) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) block()
+        else { pendingAfterMic = block; micPermission.launch(Manifest.permission.RECORD_AUDIO) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,6 +119,7 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
 
         b.btnMic.setOnClickListener { startVoice() }
         b.btnMic.setOnLongClickListener { voice.chooseEngine(); true }
+        b.voiceBanner.setOnClickListener { handsFree.stopReading() }
         b.btnKeyboard.setOnClickListener { toggleKeyboard() }
         b.btnPaste.setOnClickListener { pasteClipboard() }
         b.btnLink.setOnClickListener { lastUrl?.let { openUrl(it) } }
@@ -116,6 +134,8 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
         bindService(svc, conn, Context.BIND_AUTO_CREATE)
 
         if (BuildConfig.DEBUG) intent.getStringExtra("debug_transcribe")?.let { debugTranscribe(it) }
+        // `--es debug_hear "text send to claude"`: hands-free pipeline without a microphone.
+        if (BuildConfig.DEBUG) intent.getStringExtra("debug_hear")?.let { t -> handler.postDelayed({ handsFree.debugHear(t) }, 4000) }
         // `--es debug_dictate file.wav`: full dictation pipeline with a WAV standing in for the mic.
         if (BuildConfig.DEBUG) intent.getStringExtra("debug_dictate")?.let { path ->
             handler.postDelayed({ voice.debugDictateFromWav(path) }, 4000) // after the session is attached
@@ -157,7 +177,8 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
             b.title.text = mode.title
             endedDialogShown = false
             attach()
-        }
+        } else if (intent.getBooleanExtra(EXTRA_HANDS_FREE, false) && !mode.isMaintenance) handsFree.enable()
+        if (BuildConfig.DEBUG) intent.getStringExtra("debug_hear")?.let { t -> handler.postDelayed({ handsFree.debugHear(t) }, 1500) }
     }
 
     private fun attach() {
@@ -176,8 +197,9 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
         lastUrl = null
         b.btnLink.visibility = View.GONE
         b.terminalView.requestFocus()
-        if (mode != Mode.SETUP && mode != Mode.UPDATE) {
-            b.terminalView.postDelayed({ showKeyboard() }, 300)
+        if (!mode.isMaintenance) {
+            val wantHandsFree = intent.getBooleanExtra(EXTRA_HANDS_FREE, false) || prefs.handsFreeDefault
+            if (wantHandsFree) handsFree.enable() else b.terminalView.postDelayed({ showKeyboard() }, 300)
             if (existed) checkWorkspaceChanged(svc, s)
         }
     }
@@ -211,6 +233,7 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
 
     override fun onDestroy() {
         voice.stop()
+        handsFree.release()
         handler.removeCallbacksAndMessages(null)
         service?.let { if (it.uiClient === this) it.uiClient = null }
         try { unbindService(conn) } catch (_: Exception) {}
@@ -236,11 +259,12 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
         imm.toggleSoftInputFromWindow(b.terminalView.windowToken, 0, 0)
     }
 
-    private fun insertText(text: String, pressEnter: Boolean) {
+    private fun insertText(text: String, pressEnter: Boolean, quiet: Boolean = false) {
         val s = session ?: return
         val emu = s.emulator
         if (emu != null) emu.paste(text) else s.write(text)
         if (pressEnter) s.write("\r")
+        if (quiet) return
         b.voiceBanner.text = "Inserted: $text"
         b.voiceBanner.visibility = View.VISIBLE
         handler.postDelayed({ b.voiceBanner.visibility = View.GONE }, 2500)
@@ -252,7 +276,11 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
         session?.emulator?.paste(text)
     }
 
-    private fun startVoice() = voice.start()
+    private fun startVoice() {
+        // Hands-free already owns the microphone; the mic button then turns it off.
+        if (handsFree.enabled) { handsFree.disable(); Toast.makeText(this, "Hands-free off", Toast.LENGTH_SHORT).show(); return }
+        voice.start()
+    }
 
     private fun showMenu(anchor: View) {
         val m = PopupMenu(this, anchor)
@@ -262,7 +290,8 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
         m.menu.add(0, 4, 3, "Font size -")
         m.menu.add(0, 5, 4, if (b.extraKeysScroll.visibility == View.VISIBLE) "Hide extra keys" else "Show extra keys")
         m.menu.add(0, 7, 5, getString(R.string.open_working_folder))
-        m.menu.add(0, 6, 6, "Settings")
+        if (!mode.isMaintenance) m.menu.add(0, 8, 6, getString(R.string.hands_free) + if (handsFree.enabled) "  ✓" else "")
+        m.menu.add(0, 6, 7, "Settings")
         m.setOnMenuItemClickListener {
             when (it.itemId) {
                 1 -> restartSession()
@@ -272,6 +301,7 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
                 5 -> b.extraKeysScroll.visibility = if (b.extraKeysScroll.visibility == View.VISIBLE) View.GONE else View.VISIBLE
                 6 -> startActivity(Intent(this, SettingsActivity::class.java))
                 7 -> FolderBrowser.open(this, service?.cwdOf(mode) ?: Workspace.current(this))
+                8 -> handsFree.toggle()
             }
             true
         }
@@ -422,6 +452,7 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
         if (s !== session) return
         b.terminalView.onScreenUpdated()
         scheduleUrlScan()
+        handsFree.onOutputChanged()
     }
 
     override fun onTitleChanged(s: TerminalSession) {
@@ -513,9 +544,10 @@ class TerminalActivity : AppCompatActivity(), TerminalViewClient, TerminalSessio
     companion object {
         private const val TAG = "TerminalActivity"
         private val URL_RE = Regex("""https?://[^\s"'<>]+""")
+        const val EXTRA_HANDS_FREE = "hands_free"
 
-        fun launch(c: Context, mode: Mode) {
-            c.startActivity(Intent(c, TerminalActivity::class.java).putExtra(Mode.EXTRA, mode.key))
+        fun launch(c: Context, mode: Mode, handsFree: Boolean = false) {
+            c.startActivity(Intent(c, TerminalActivity::class.java).putExtra(Mode.EXTRA, mode.key).putExtra(EXTRA_HANDS_FREE, handsFree))
         }
     }
 }

@@ -80,11 +80,11 @@ class WhisperEngine(private val c: Context) {
         }
     }
 
-    fun transcribe(pcm: FloatArray, language: String, translate: Boolean = false): String {
+    fun transcribe(pcm: FloatArray, language: String, translate: Boolean = false, prompt: String? = null): String {
         synchronized(WhisperEngine) {
             if (ctx == 0L) throw IOException("Model not loaded")
             val threads = Runtime.getRuntime().availableProcessors().coerceIn(1, 4)
-            return WhisperLib.transcribe(ctx, pcm, language, threads, translate, promptFor(language)).trim()
+            return WhisperLib.transcribe(ctx, pcm, language, threads, translate, prompt ?: promptFor(language)).trim()
         }
     }
 

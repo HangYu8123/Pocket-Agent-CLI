@@ -58,6 +58,36 @@ Technical reference for people building or modifying the app. For usage, see the
   offline whisper.cpp (`app/src/main/cpp`, built with the NDK, models from Hugging Face
   `ggerganov/whisper.cpp`, q5_1 quantised) → keyboard mic. Debug builds accept
   `am start … --es debug_transcribe file.wav` for automated tests.
+* **Always-on speech** (`Speech.kt`): `SegmentRecorder` keeps `AudioRecord` open and cuts the
+  stream into phrases by energy (RMS gate, 400 ms pre-roll, end after ~1 s of silence), so
+  Whisper only runs on speech. `Listener` feeds those phrases to whisper.cpp on one worker
+  thread and delivers text on the main thread; `Speaker` wraps `TextToSpeech` with per-request
+  completion callbacks. `VoiceCommands` is the pure parser (unit-tested in `app/src/test`).
+* **Wake word** (`WakeWordService.kt`): a `microphone` foreground service running `Listener`
+  with the Tiny model and a "Hey Pat." prompt; a fuzzy match (edit distance ≤ 1 per short word)
+  opens `MainActivity` with `EXTRA_VOICE`. It pauses whenever an app activity is started
+  (`App` tracks the foreground state) so the activities can use the mic. Background activity
+  starts need `SYSTEM_ALERT_WINDOW` on Android 10+; without it a full-screen-intent notification
+  is posted instead. Android 15 refuses microphone services from `BOOT_COMPLETED`, so the boot
+  receiver posts a "resume" notification and `MainActivity.onResume` restarts the service.
+* **Voice commands** (`VoiceControl.kt`): a small state machine (command → folder name → which
+  agent) driven by one-shot `Listener` runs and spoken prompts. New folders go under
+  `Workspace.DEFAULT` and become the working folder before the agent launches.
+* **Hands-free mode** (`HandsFree.kt`): continuous `Listener`; `VoiceCommands.splitSend` strips
+  a trailing "send to Claude Code/Codex" and presses Enter. Reading uses terminal quiescence:
+  every `onTextChanged` restarts a 2.5 s timer (Claude Code's spinner redraws far more often),
+  and when it fires `extractNew()` diffs the emulator transcript against the last snapshot,
+  drops box-drawing chrome, status hints, lines already on screen and the echo of the sent
+  message, then speaks the rest. The listener is muted while TTS plays.
+* **i-have-adhd skill** (`bootstrap.sh --skills`, bundled in `assets/skills`): runs at the end
+  of setup and of every update, and from Settings. Codex: `codex plugin marketplace add` +
+  `codex plugin add`, rules block appended to `~/.codex/AGENTS.md` (the always-on route the
+  skill documents). Claude Code: `claude plugin marketplace add` + `claude plugin install`, then
+  `touch ~/.claude/.i-have-adhd-always` so the plugin's SessionStart hook injects the ruleset.
+  Both CLIs must get `</dev/null`: with the terminal on stdin they block forever. If the plugin
+  route fails (offline), the bundled copy goes to `~/.claude/skills` / `~/.codex/skills` and a
+  SessionStart hook in `~/.claude/settings.json` replaces the plugin's. Output of the plugin
+  commands lands in `/pocketagent/skills.log`.
 
 ## Build
 
@@ -113,6 +143,20 @@ one is for the emulator.
   emulator with a window and send `adb emu avd hostmicon`; `AudioRecord` then receives audio, but
   it arrives heavily muffled and Whisper cannot transcribe it, so real speech recognition through
   the microphone is only meaningful on a phone.
+
+## Verifying voice control without a microphone
+
+Debug builds take text in place of speech, so the flows run on the emulator:
+
+* Home screen: `am start -n com.pocketagent/.MainActivity --es debug_say "create a new folder"`,
+  then `--es debug_say "voice memo app"`, then `--es debug_say "claude"`; logcat tag
+  `VoiceControl` shows each spoken prompt (`VOICE_SAY: …`), the folder appears under
+  `files/ubuntu/root/projects`, the `workspace` preference changes and Claude Code launches.
+* Hands-free: `am start -n com.pocketagent/.TerminalActivity --es mode shell --es debug_hear
+  "echo hello from pocket, send to Claude Code."` types the command, presses Enter and, once the
+  output settles, logs `HANDSFREE_SPEAK: hello from pocket` (tag `HandsFree`).
+* `./gradlew testDebugUnitTest` covers the parser, the send-phrase split, wake-word matching and
+  transcript diffing.
 
 ## Gotchas found the hard way
 

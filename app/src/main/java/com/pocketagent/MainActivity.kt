@@ -1,6 +1,8 @@
 package com.pocketagent
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -9,6 +11,7 @@ import android.view.View
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -27,6 +30,23 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var b: ActivityMainBinding
     private var installJob: Job? = null
+    private val prefs by lazy { Prefs(this) }
+    private var pendingAfterMic: (() -> Unit)? = null
+    private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val next = pendingAfterMic; pendingAfterMic = null
+        if (granted) next?.invoke() else toast("Microphone permission denied")
+    }
+    private val voice by lazy {
+        VoiceControl(this) { s ->
+            b.voiceStatus.text = s ?: getString(R.string.voice_command_sub)
+        }
+    }
+
+    /** Runs [block] once RECORD_AUDIO is granted (asking if needed). */
+    fun withMic(block: () -> Unit) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) block()
+        else { pendingAfterMic = block; micPermission.launch(Manifest.permission.RECORD_AUDIO) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,13 +68,40 @@ class MainActivity : AppCompatActivity() {
         b.btnChooseFolder.setOnClickListener { chooseFolder() }
         b.btnNewFolder.setOnClickListener { newFolder() }
         b.btnOpenFolder.setOnClickListener { FolderBrowser.open(this) }
-        b.hint.text = "Tip: agents start in the working folder above. In the terminal, tap the microphone to dictate. " +
-            "Login links from Claude Code and Codex open in your browser automatically."
+        b.btnVoice.setOnClickListener { voice.start(fromWake = false) }
+        b.btnVoice.setOnLongClickListener {
+            AlertDialog.Builder(this).setTitle(R.string.voice_command).setMessage(VoiceCommands.HELP)
+                .setPositiveButton(android.R.string.ok, null).show(); true
+        }
+        b.hint.text = "Tip: agents start in the working folder above. In the terminal, tap the microphone to dictate, " +
+            "or turn on hands-free mode (terminal menu) to talk and listen without touching the phone. " +
+            "Say \"${prefs.wakePhrase}\" to open the app when the wake word is on (Settings → Voice control)."
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    /** Wake word heard (service) or "resume wake word" notification (boot receiver). */
+    private fun handleIntent(i: Intent?) {
+        if (i == null) return
+        if (i.getBooleanExtra(EXTRA_VOICE, false)) {
+            i.removeExtra(EXTRA_VOICE)
+            b.root.post { voice.start(fromWake = true) }
+        }
+        if (BuildConfig.DEBUG) i.getStringExtra("debug_say")?.let { t -> i.removeExtra("debug_say"); b.root.postDelayed({ voice.debugHear(t) }, 500) }
+        if (i.getBooleanExtra(EXTRA_START_WAKE, false)) {
+            i.removeExtra(EXTRA_START_WAKE)
+            if (prefs.wakeWordEnabled) WakeWordService.start(this)
+        }
     }
 
     // ---------------------------------------------------------------- working folder
 
-    private fun refreshWorkspace() {
+    fun refreshWorkspace() {
         val ws = Workspace.current(this)
         b.workspacePath.text = ws
         val note = when {
@@ -190,6 +237,19 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refresh()
+        // The detector stops with a reboot or a "Turn off" tap; opening the app brings it back
+        // (from the foreground Android allows a microphone service to start).
+        if (prefs.wakeWordEnabled && !WakeWordService.isRunning && WakeWordService.hasMic(this)) WakeWordService.start(this)
+    }
+
+    override fun onPause() {
+        voice.cancel()
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        voice.release()
+        super.onDestroy()
     }
 
     private fun refresh() {
@@ -264,5 +324,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    companion object {
+        /** Boolean extra: open in voice-command mode (set by the wake-word service). */
+        const val EXTRA_VOICE = "voice"
+        /** Boolean extra: start the wake-word detector (from the after-reboot notification). */
+        const val EXTRA_START_WAKE = "start_wake"
     }
 }

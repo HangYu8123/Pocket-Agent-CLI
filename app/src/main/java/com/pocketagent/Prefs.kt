@@ -27,4 +27,22 @@ class Prefs(c: Context) {
 
     /** BCP-47 tag such as en, zh, or "auto". */
     val voiceLanguage get() = p.getString("voice_language", "auto") ?: "auto"
+
+    // ---- voice control
+
+    /** Background "hey Pat" detector (WakeWordService). */
+    var wakeWordEnabled: Boolean
+        get() = p.getBoolean("wake_word", false)
+        set(v) = p.edit().putBoolean("wake_word", v).apply()
+
+    val wakePhrase: String
+        get() = (p.getString("wake_phrase", VoiceCommands.DEFAULT_WAKE) ?: VoiceCommands.DEFAULT_WAKE).trim().ifBlank { VoiceCommands.DEFAULT_WAKE }
+
+    /** Every new Claude Code / Codex / shell session starts in hands-free mode. */
+    var handsFreeDefault: Boolean
+        get() = p.getBoolean("hands_free_default", false)
+        set(v) = p.edit().putBoolean("hands_free_default", v).apply()
+
+    /** Sessions opened by voice command start hands-free even when [handsFreeDefault] is off. */
+    val voiceLaunchHandsFree get() = p.getBoolean("voice_launch_hands_free", true)
 }

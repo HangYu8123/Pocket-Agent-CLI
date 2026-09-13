@@ -41,7 +41,7 @@ Speak or type. The agent writes the code, runs it, fixes it. Your laptop stays o
 
 ## How to use
 
-7 things to know. Everything else works like the desktop CLI.
+8 things to know. Everything else works like the desktop CLI.
 
 1. **Home screen** — Claude Code, Codex, Ubuntu shell. A *running* badge means the session is still alive; tap to jump back in.
 2. **Mic button** — tap, speak, Enter. Long-press to pick the engine: phone speech service, offline Whisper (built in, no Google), or your keyboard's mic key.
@@ -50,6 +50,28 @@ Speak or type. The agent writes the code, runs it, fixes it. Your laptop stays o
 5. **Links** — login pages open in your browser by themselves. The 🔗 icon re-opens the last one.
 6. **Background** — sessions keep running while you switch apps. Keep the notification on.
 7. **Python** — `python`, `pip install x`, `apt install y` all work in the Ubuntu shell. Everything stays installed.
+8. **ADHD-friendly answers** — the [i-have-adhd](https://github.com/ayghri/i-have-adhd) skill is installed for both agents and on by default: action first, numbered steps, no rambling. Say "stop adhd mode" in a session to switch it off.
+
+## Talk to it
+
+No hands needed. Everything below runs on the built-in offline Whisper, so nothing leaves the phone.
+
+| Say | What happens |
+| --- | --- |
+| **"Hey Pat"** (anywhere, app closed) | Pocket-CLI opens and listens for a command. Turn it on in *Settings → Voice control → Wake word*; change the phrase there too. |
+| **"Open Claude"** · **"Open Codex"** · **"Open terminal"** | Starts that session in the working folder. Also works from the **Voice command** button on the home screen. |
+| **"Create a new folder"** | Asks for a name, creates it under `~/projects`, selects it, then asks which agent to open there. |
+| **"… send to Claude Code"** / **"… send to Codex"** | In hands-free mode: everything you said before it is typed into the agent and sent. |
+| **"Stop reading"** · **"Read again"** · **"Escape"** · **"Hands-free off"** | Controls while hands-free. |
+
+**Hands-free mode** (terminal menu → *Hands-free mode*, automatic for sessions you open by voice): the
+mic stays open, your words go into the input box, and when the agent finishes writing, its reply is read
+aloud. Tap the banner to stop reading. *Settings → Voice control* can make every session start hands-free.
+
+Wake word notes: Android only lets an app open itself from the background when it may *display over other
+apps*; grant that when asked, otherwise a notification appears for you to tap. Xiaomi/HyperOS also needs
+*Display pop-up windows while running in the background*. After a reboot, open the app once (or tap the
+notification) to resume listening.
 
 ## Tune it
 
@@ -64,6 +86,9 @@ Settings live under **⋮** on the home screen.
 | Files visible to other apps | *Allow access to phone storage*, then use a *Phone ·* folder |
 | Newer Claude Code / Codex | *Update Claude Code and Codex* |
 | Phone kills the agent overnight | Battery → *No restrictions*; on Xiaomi also *Autostart* + lock in Recents |
+| Sessions always hands-free | *Voice control → Start sessions hands-free* |
+| Different wake phrase | *Voice control → Wake phrase* |
+| ADHD skill missing or outdated | *Reinstall the i-have-adhd skill* |
 | Fresh start | *Reinstall Ubuntu environment* |
 
 Mic silent? *Settings → Voice input not working?* tells you which engines your phone has and switches you to offline Whisper.
@@ -72,6 +97,7 @@ Mic silent? *Settings → Voice input not working?* tells you which engines your
 
 Standing on: [proot](https://github.com/termux/proot) and the [Termux](https://termux.dev) terminal
 engine, [Ubuntu](https://ubuntu.com) 24.04, [whisper.cpp](https://github.com/ggml-org/whisper.cpp),
+the [i-have-adhd](https://github.com/ayghri/i-have-adhd) skill by Ayoub G. (MIT),
 and of course [Claude Code](https://claude.com/claude-code) by Anthropic and
 [Codex](https://openai.com/codex) by OpenAI, each of which needs your own account.
 

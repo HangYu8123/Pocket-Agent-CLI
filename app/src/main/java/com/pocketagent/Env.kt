@@ -49,7 +49,11 @@ enum class Mode(val key: String, val title: String, val command: String, val cwd
     CODEX("codex", "Codex", "bash ${Env.GUEST_BRIDGE}/bootstrap.sh --ensure codex && exec codex"),
     SHELL("shell", "Ubuntu", ""),
     SETUP("setup", "Setup", "bash ${Env.GUEST_BRIDGE}/bootstrap.sh", "/root"),
-    UPDATE("update", "Update CLIs", "bash ${Env.GUEST_BRIDGE}/bootstrap.sh --update", "/root");
+    UPDATE("update", "Update CLIs", "bash ${Env.GUEST_BRIDGE}/bootstrap.sh --update", "/root"),
+    SKILLS("skills", "Install skill", "bash ${Env.GUEST_BRIDGE}/bootstrap.sh --skills", "/root");
+
+    /** Setup-style runs: no keyboard, fixed working directory, not an agent session. */
+    val isMaintenance get() = this == SETUP || this == UPDATE || this == SKILLS
 
     companion object {
         const val EXTRA = "mode"
